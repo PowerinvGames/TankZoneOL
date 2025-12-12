@@ -2,8 +2,7 @@ import arcade
 
 from python.util.ConfigureUtil import ConfigureUtil
 from python.util.I18nUtil import I18nUtil
-from python.util.LanguageManager import Language
-from python.util.LanguageManager import LanguageManager
+from python.util.LanguageManager import Language, LanguageManager
 
 
 class GameWindow(arcade.Window):
@@ -22,4 +21,11 @@ if __name__ == "__main__":
     LanguageManager.change_language(Language.EN_US)
     font_file: str = ConfigureUtil.get_config("common.fonts.harmonyossans.regular")
     print(font_file)
+    print("color.test.1", ConfigureUtil.get_config("color.test.1"))
+    print("color.test.2", ConfigureUtil.get_config("color.test.2"))
+    print("color.test.3", ConfigureUtil.get_config("color.test.3"))
+    print("color.test.4", ConfigureUtil.get_config("color.test.4"))
+    print("color.test.5", ConfigureUtil.get_config("color.test.5"))
+    print("color.test.6", ConfigureUtil.get_config("color.test.6"))
+    print("color.test.7", ConfigureUtil.get_config("color.test.7"))
     game_window.run()

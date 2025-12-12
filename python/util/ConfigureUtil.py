@@ -1,10 +1,9 @@
 import logging
 import os
+import re
 import sys
 from enum import Enum
-from typing import Dict
-from typing import Optional
-from typing import Tuple
+from typing import Dict, List, Optional, Tuple, TypeAlias
 
 from pyjavaproperties import Properties
 
@@ -14,23 +13,45 @@ from python.util.PgLoggerFactory import PgLoggerFactory
 LOGGER: logging.Logger = PgLoggerFactory.get_logger(__name__)
 PROPERTIES_ENCODING: str = "ISO-8859-1"
 
+# 类型别名定义
+ColorType: TypeAlias = Tuple[int, int, int] | Tuple[int, int, int, int]
+ConfigValueType: TypeAlias = str | int | float | bool | ColorType
+
+
 class ConfigureType(Enum):
+    """
+    配置类型枚举类
+    :since: 2025-12-13
+    """
     UI_CONFIG = "classpath:config/ui.properties"
     I18N_MAIN_CONFIG = "i18n:common.i18n.main"
     I18N_GAME_CONFIG = "i18n:common.i18n.game"
 
 class ConfigureUtil:
-    _configure_cache: Dict[ConfigureType, Dict[str, str | int | float | bool | Tuple[int, int, int]]] = {}
+    """
+    配置文件解析工具类
+    :since: 2025-12-13
+    """
+
+    _configure_cache: Dict[ConfigureType, Dict[str, ConfigValueType]] = {}
 
     @classmethod
     def on_change_language(cls) -> None:
+        """
+        语言切换回调，删除已缓存的国际化键值对
+        """
         for configure_type in ConfigureType:
             if configure_type.value.startswith("i18n:") and configure_type in cls._configure_cache:
                 cls._configure_cache.pop(configure_type)
 
     @classmethod
-    def get_config(cls, key: str, resource_type: ConfigureType = ConfigureType.UI_CONFIG)\
-            -> Optional[str | int | float | bool | Tuple[int, int, int]]:
+    def get_config(cls, key: str, resource_type: ConfigureType = ConfigureType.UI_CONFIG) -> Optional[ConfigValueType]:
+        """
+        获取配置
+        :param key: 键
+        :param resource_type: 配置类型
+        :return: 配置值
+        """
         if resource_type is None or key is None or len(key.strip()) == 0:
             return None
         if resource_type not in cls._configure_cache:
@@ -38,7 +59,7 @@ class ConfigureUtil:
             configure_properties: Properties = Properties()
             with open(configure_file_path, "r", encoding=PROPERTIES_ENCODING) as configure_file:
                 configure_properties.load(configure_file)
-            configure_dict: Dict[str, str | int | float | bool | Tuple[int, int, int]] = {}
+            configure_dict: Dict[str, ConfigValueType] = {}
             for current_key, current_value in configure_properties.getPropertyDict().items():
                 real_key, real_value = cls.__parse_configure_value(current_key, current_value)
                 configure_dict[real_key] = real_value
@@ -58,11 +79,16 @@ class ConfigureUtil:
         elif relative_path.startswith("i18n:"):
             relative_path: str = cls.get_config(relative_path.removeprefix("i18n:"), ConfigureType.UI_CONFIG)\
                 .format(language=LanguageManager.get_current_language().value)
-        return cls.__get_absolute_resource_file_path(relative_path)
+        return cls.__get_absolute_resource_path(relative_path)
 
     @classmethod
-    def __parse_configure_value(cls, key: str, value: Optional[str])\
-            -> Tuple[str, Optional[str | int | float | bool | Tuple[int, int, int]]]:
+    def __parse_configure_value(cls, key: str, value: Optional[str]) -> Tuple[str, Optional[ConfigValueType]]:
+        """
+        解析配置后缀，转换值类型
+        :param key: 键
+        :param value: 原始字符串值
+        :return: 转换类型后的值
+        """
         if value is None:
             return key, None
         elif key.endswith(".str"):
@@ -73,18 +99,48 @@ class ConfigureUtil:
             return key.removesuffix(".float"), float(value)
         elif key.endswith(".bool"):
             return key.removesuffix(".bool"), bool(value)
-        elif key.endswith(".tuple"):
-            return key.removesuffix(".tuple"), (0, 0, 0)
+        elif key.endswith(".color"):
+            return key.removesuffix(".color"), cls.__format_color_value(value.strip())
         elif key.endswith(".file"):
-            return key.removesuffix(".file"), cls.__get_absolute_resource_file_path(cls.__decode_unicode_value(value))
+            return key.removesuffix(".file"), cls.__get_absolute_resource_path(cls.__decode_unicode_value(value))
         return key, cls.__decode_unicode_value(value)
 
     @classmethod
     def __decode_unicode_value(cls, value: str) -> str:
+        """
+        Unicode解码
+        :param value: ISO-8859-1编码的值
+        :return: 经过Unicode解码后UTF-8编码的值
+        """
         return value.encode(PROPERTIES_ENCODING).decode("unicode_escape")
 
     @classmethod
-    def __get_absolute_resource_file_path(cls, relative_path: str) -> str:
+    def __format_color_value(cls, value: str) -> Optional[ColorType]:
+        """
+        解析并转换颜色类型
+        :param value: 颜色类型字符串
+        :return: RGB/RGBA颜色元组
+        """
+        if value.startswith("#"):
+            if len(value) == 4:
+                return int(value[1] * 2, 16), int(value[2] * 2, 16), int(value[3] * 2, 16) # RGB
+            if len(value) == 7:
+                return int(value[1:3], 16), int(value[3:5], 16), int(value[5:], 16) # RRGGBB
+            elif len(value) == 9:
+                return int(value[1:3], 16), int(value[3:5], 16), int(value[5:7], 16), int(value[7:], 16) # RRGGBBAA
+        result: List[int] = [0, 0, 0, 255]
+        numbers = re.findall(r'-?\d+(?:\.\d+)?', value)
+        for i in range(min(len(numbers), 4)):
+            result[i] = int(max(0, min(255, int(numbers[i]))))
+        return result[0], result[1], result[2], result[3] # (RRR, GGG, BBB, AAA)
+
+    @classmethod
+    def __get_absolute_resource_path(cls, relative_path: str) -> str:
+        """
+        根据资源URI获取资源文件绝对路径
+        :param relative_path: 资源URI
+        :return: 资源文件绝对路径
+        """
         if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
             base_dir = sys._MEIPASS
             resource_root = os.path.join(base_dir, "..", "resources")

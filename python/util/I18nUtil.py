@@ -1,7 +1,6 @@
 from typing import Optional
 
-from python.util.ConfigureUtil import ConfigureType
-from python.util.ConfigureUtil import ConfigureUtil
+from python.util.ConfigureUtil import ConfigureType, ConfigureUtil
 
 
 class I18nUtil:

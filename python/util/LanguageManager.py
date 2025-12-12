@@ -1,6 +1,5 @@
 from enum import Enum
-from typing import Callable
-from typing import List
+from typing import Callable, List
 
 
 class Language(Enum):
