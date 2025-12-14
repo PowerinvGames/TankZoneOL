@@ -129,7 +129,7 @@ class ConfigureUtil:
             elif len(value) == 9:
                 return int(value[1:3], 16), int(value[3:5], 16), int(value[5:7], 16), int(value[7:], 16) # RRGGBBAA
         result: List[int] = [0, 0, 0, 255]
-        numbers = re.findall(r'-?\d+(?:\.\d+)?', value)
+        numbers = re.findall(r"-?\d+(?:\.\d+)?", value)
         for i in range(min(len(numbers), 4)):
             result[i] = int(max(0, min(255, int(numbers[i]))))
         return result[0], result[1], result[2], result[3] # (RRR, GGG, BBB, AAA)
